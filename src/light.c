@@ -17,6 +17,18 @@
 
 /* Static helper functions for this file only, prefix with _ */
 
+// Changes brightness smoothly from start value to end value
+static void _fade_value(light_device_target_t *target, uint64_t start_value, uint64_t end_value)
+{
+    int steps = 20;
+    uint64_t step_size = (uint64_t) ( ((float)end_value - (float)start_value) / (float)steps );
+
+    for(int i=1; i<steps-1; i++)
+    {
+      target->set_value(target, start_value + i * step_size);
+      usleep(10000);
+    }
+}
 
 static void _light_add_enumerator_device(light_device_enumerator_t *enumerator, light_device_t *new_device)
 {
@@ -721,13 +733,16 @@ bool light_cmd_set_brightness(light_context_t *ctx)
         return false;
     }
     
-    
     uint64_t mincap = _light_get_min_cap(ctx);
     uint64_t value = ctx->run_params.value;
     if(mincap > value)
     {
         value = mincap;
     }
+
+    uint64_t start_value;
+    target->get_value(target, &start_value);
+    _fade_value(target, start_value, value);
     
     if(!target->set_value(target, value))
     {
@@ -899,6 +914,10 @@ bool light_cmd_add_brightness(light_context_t *ctx)
         value = max_value;
     }
     
+    uint64_t start_value;
+    target->get_value(target, &start_value);
+    _fade_value(target, start_value, value);
+
     if(!target->set_value(target, value))
     {
         LIGHT_ERR("failed to write to target");
@@ -938,6 +957,10 @@ bool light_cmd_sub_brightness(light_context_t *ctx)
     {
         value = mincap;
     }
+
+    uint64_t start_value;
+    target->get_value(target, &start_value);
+    _fade_value(target, start_value, value);
 
     if(!target->set_value(target, value))
     {
@@ -993,6 +1016,10 @@ bool light_cmd_mul_brightness(light_context_t *ctx)
     {
         value = max_value;
     }
+
+    uint64_t start_value;
+    target->get_value(target, &start_value);
+    _fade_value(target, start_value, value);
 
     if(!target->set_value(target, value))
     {
