@@ -78,6 +78,7 @@ struct _light_context_t
         float                   float_value; // The input value as a float
         bool                    raw_mode; // Whether or not we use raw or percentage mode
         light_device_target_t   *device_target; // The device target to act on
+        int32_t                 smooth_ms; // Smoothing time in milliseconds
     } run_params;
 
     struct

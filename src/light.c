@@ -17,16 +17,19 @@
 
 /* Static helper functions for this file only, prefix with _ */
 
-// Changes brightness smoothly from start value to end value
-static void _fade_value(light_device_target_t *target, uint64_t start_value, uint64_t end_value)
+// Changes brightness smoothly from start_value to end_value
+static void _fade_value(light_context_t *ctx, uint64_t start_value, uint64_t end_value)
 {
-    int steps = 20;
+    light_device_target_t *target = ctx->run_params.device_target;
+
+    useconds_t step_time = 10e3; // Microseconds per step
+    int steps = (ctx->run_params.smooth_ms * 1e3) / step_time;
     uint64_t step_size = (uint64_t) ( ((float)end_value - (float)start_value) / (float)steps );
 
     for(int i=1; i<steps-1; i++)
     {
       target->set_value(target, start_value + i * step_size);
-      usleep(10000);
+      usleep(step_time);
     }
 }
 
@@ -216,6 +219,7 @@ static void _light_print_usage()
         "Options:\n"
         "  -r          Interpret input and output values in raw mode (ignored for -T)\n"
         "  -s          Specify device target path to use, use -L to list available\n"
+        "  -t          Specify milliseconds taken to smoothly transition brightness (default 0)\n"
         "  -v          Specify the verbosity level (default 0)\n"
         "                 0: Values only\n"
         "                 1: Values, Errors.\n"
@@ -245,6 +249,7 @@ static bool _light_parse_arguments(light_context_t *ctx, int argc, char** argv)
 {
     int32_t curr_arg = -1;
     int32_t log_level = 0;
+    int32_t smooth_ms = 0;
     
     char ctrl_name[NAME_MAX];
     bool need_value = false;
@@ -253,7 +258,7 @@ static bool _light_parse_arguments(light_context_t *ctx, int argc, char** argv)
     bool specified_target = false;
     snprintf(ctrl_name, sizeof(ctrl_name), "%s", "sysfs/backlight/auto");
     
-    while((curr_arg = getopt(argc, argv, "HhVGSLMNPAUTOIv:s:r")) != -1)
+    while((curr_arg = getopt(argc, argv, "HhVGSLMNPAUTOIv:t:s:r")) != -1)
     {
         switch(curr_arg)
         {
@@ -275,6 +280,22 @@ static bool _light_parse_arguments(light_context_t *ctx, int argc, char** argv)
                 }
                 
                 light_loglevel = (light_loglevel_t)log_level;
+                break;
+            case 't':
+                if(sscanf(optarg, "%i", &smooth_ms) != 1)
+                {
+                    fprintf(stderr, "-t argument is not an integer.\n\n");
+                    _light_print_usage();
+                    return false;
+                }
+                if(smooth_ms < 0)
+                {
+                    fprintf(stderr, "-t argument can't be negative.\n\n");
+                    _light_print_usage();
+                    return false;
+                }
+
+                ctx->run_params.smooth_ms = smooth_ms;
                 break;
             case 's':
                 snprintf(ctrl_name, sizeof(ctrl_name), "%s", optarg);
@@ -742,7 +763,7 @@ bool light_cmd_set_brightness(light_context_t *ctx)
 
     uint64_t start_value;
     target->get_value(target, &start_value);
-    _fade_value(target, start_value, value);
+    _fade_value(ctx, start_value, value);
     
     if(!target->set_value(target, value))
     {
@@ -916,7 +937,7 @@ bool light_cmd_add_brightness(light_context_t *ctx)
     
     uint64_t start_value;
     target->get_value(target, &start_value);
-    _fade_value(target, start_value, value);
+    _fade_value(ctx, start_value, value);
 
     if(!target->set_value(target, value))
     {
@@ -960,7 +981,7 @@ bool light_cmd_sub_brightness(light_context_t *ctx)
 
     uint64_t start_value;
     target->get_value(target, &start_value);
-    _fade_value(target, start_value, value);
+    _fade_value(ctx, start_value, value);
 
     if(!target->set_value(target, value))
     {
@@ -1019,7 +1040,7 @@ bool light_cmd_mul_brightness(light_context_t *ctx)
 
     uint64_t start_value;
     target->get_value(target, &start_value);
-    _fade_value(target, start_value, value);
+    _fade_value(ctx, start_value, value);
 
     if(!target->set_value(target, value))
     {
